@@ -31,13 +31,14 @@ class MLAlgorithmViewSet(
     serializer_class = MLAlgorithmSerializer
     queryset = MLAlgorithm.objects.all()
 
-    def deactivate_other_statuses(instance):
-        old_statuses = MLAlgorithmStatus.objects.filter(parent_mlalgorithm = instance.parent_mlalgorithm,
-                                                        created_at__lt=instance.created_at,
-                                                        active=True)
-        for i in range(len(old_statuses)):
-            old_statuses[i].active = False
-        MLAlgorithmStatus.objects.bulk_update(old_statuses, ["active"])
+    
+def deactivate_other_statuses(instance):
+    old_statuses = MLAlgorithmStatus.objects.filter(parent_mlalgorithm = instance.parent_mlalgorithm,
+                                                    created_at__lt=instance.created_at,
+                                                    active=True)
+    for i in range(len(old_statuses)):
+        old_statuses[i].active = False
+    MLAlgorithmStatus.objects.bulk_update(old_statuses, ["active"])
 
     
 class MLAlgorithmStatusViewSet(
