@@ -2,9 +2,9 @@ from django.shortcuts import render
 
 # Create your views here.
 
-from rest_framework import viewsets
+from rest_framework import viewsets, views, status
 from rest_framework import mixins
-
+from rest_framework.response import Response
 
 from apps.endpoints.models import Endpoint
 from apps.endpoints.serializers import EndpointSerializer
@@ -17,6 +17,12 @@ from apps.endpoints.serializers import MLAlgorithmStatusSerializer
 
 from apps.endpoints.models import MLRequest
 from apps.endpoints.serializers import MLRequestSerializer
+
+from apps.ml.registry import MLRegistry
+from server.wsgi import registry
+
+import json
+from numpy.random import rand
 
 class EndpointViewSet(mixins.RetrieveModelMixin, 
                       mixins.ListModelMixin, 
@@ -66,3 +72,45 @@ class MLRequestViewSet(
 ):
     serializer_class = MLRequestSerializer
     queryset = MLRequest.objects.all()
+
+    
+class PredictView(views.APIView):
+    def post(self, request, endpoint_name, format = None):
+        alg_status = self.request.query_params.get("status", "production")
+        alg_ver = self.request.query_params.get("version")
+        
+        algs = MLAlgorithm.objects.filter(parent_endpoint__name = endpoint_name, 
+                                          status__status = alg_status, status__active = True)
+        
+        if alg_ver != None:
+            algs = algs.filter(version = alg_ver)
+        if len(algs) == 0:
+            return Response({"status": "Error", "message": "ML algorithm is not available"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(algs) != 1 and alg_status != "ab_testing":
+            return Response(
+                {"status": "Error", "message": "ML algorithm selection is ambiguous. Please specify algorithm version."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        alg_index = 0
+        if alg_status == "ab_testing" and rand() >= 0.5:
+            alg_index = 1
+
+        algorithm_object = registry.endpoints[algs[alg_index].id]
+        prediction = algorithm_object.compute_prediction(request.data)
+
+        label = prediction["label"] if "label" in prediction else "error"
+        ml_request = MLRequest(
+            input_data=json.dumps(request.data),
+            full_response=prediction,
+            response=label,
+            feedback="",
+            parent_mlalgorithm=algs[alg_index],
+        )
+        ml_request.save()
+
+        prediction["request_id"] = ml_request.id
+
+        return Response(prediction)
