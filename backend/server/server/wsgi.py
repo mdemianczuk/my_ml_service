@@ -19,6 +19,7 @@ application = get_wsgi_application()
 import inspect
 from apps.ml.registry import MLRegistry
 from apps.ml.income_classifier.random_forest import RandomForestClassifier
+from apps.ml.income_classifier.extra_trees import ExtraTreesClassifier
 
 try:
     registry = MLRegistry() #create registry
@@ -30,6 +31,15 @@ try:
                            owner = "Piotr",
                            alg_desc = "Random Forest with pre and post processing",
                            alg_code = inspect.getsource(RandomForestClassifier)
+                          )
+    registry.add_algorithm(endpoint_name = "income_clasiifier",
+                           alg_object = ExtraTreesClassifier(),
+                           alg_name = "Extra Trees",
+                           alg_status = "testing",
+                           alg_version = "0.0.1",
+                           owner = "Pewnie Piotr",
+                           alg_desc = "Extra Trees with pre and post...",
+                           alg_code = inspect.getsource(ExtraTreesClassifier)
                           )
 except Exception as e:
     print("Exception while loading algorithm to registry", str(e))
